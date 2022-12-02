@@ -1,20 +1,12 @@
-from conans import ConanFile, CMake
-from conans.tools import load, cross_building
+from conan import ConanFile
+from conan.tools.build import cross_building
+from conan.tools.cmake import CMakeToolchain, CMake, cmake_layout
+from conan.tools.files import load
 import re
 
 
-def get_version():
-    try:
-        content = load("include/CLI/Version.hpp")
-        version = re.search(r'#define CLI11_VERSION "(.*)"', content).group(1)
-        return version
-    except Exception:
-        return None
-
-
 class CLI11Conan(ConanFile):
-    name = "CLI11"
-    version = get_version()
+    name = "cli11"
     description = "Command Line Interface toolkit for C++11"
     topics = ("cli", "c++11", "parser", "cli11")
     url = "https://github.com/CLIUtils/CLI11"
@@ -35,15 +27,37 @@ class CLI11Conan(ConanFile):
         "tests/*",
     )
 
+    def set_version(self):
+        try:
+            content = load(self, "include/CLI/Version.hpp")
+            version = re.search(r'#define CLI11_VERSION "(.*)"', content).group(1)
+            self.version = version
+        except Exception:
+            self.version = None
+
+    def layout(self):
+        cmake_layout(self)
+
+    def generate(self):
+        tc = CMakeToolchain(self)
+        tc.variables["CLI11_BUILD_EXAMPLES"] = "OFF"
+        tc.variables["CLI11_SINGLE_FILE"] = "OFF"
+        tc.generate()
+
     def build(self):  # this is not building a library, just tests
         cmake = CMake(self)
-        cmake.definitions["CLI11_BUILD_EXAMPLES"] = "OFF"
-        cmake.definitions["CLI11_SINGLE_FILE"] = "OFF"
         cmake.configure()
         cmake.build()
-        if not cross_building(self.settings):
+        if not cross_building(self):
             cmake.test()
+
+    def package(self):
+        cmake = CMake(self)
         cmake.install()
 
+    def package_info(self):
+        self.cpp_info.set_property("cmake_file_name", "CLI11")
+        self.cpp_info.set_property("cmake_target_name", "CLI11::CLI11")
+
     def package_id(self):
-        self.info.header_only()
+        self.info.clear()
